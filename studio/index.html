@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NoUpload Studio — local companion utilities</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="mark"><svg viewBox="0 0 64 64" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round"><path d="M20 42h25a9 9 0 0 0 .6-18A13 13 0 0 0 21 21a10.5 10.5 0 0 0-1 21Z"/><path d="M16 15 47 49"/></svg></div>
+    <div class="brand">NoUpload <span>Studio</span></div>
+    <div class="sub">companion utilities · concept demos</div>
+    <a class="back" href="../README.md">← Back to docs</a>
+  </header>
+
+  <h1>Small file tools.<br /><em>Zero uploads.</em></h1>
+  <p class="lede">Three runnable, single-page utilities that never send a byte anywhere. They ship as plain HTML, CSS and JavaScript inside this showcase repository — no build step, no backend, no analytics. Open one, drop a file, and watch the work happen in your browser.</p>
+
+  <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+    <a class="card" href="compress.html" style="text-decoration:none;color:inherit">
+      <div class="pill" style="margin-bottom:18px"><span class="dot"></span> runnable demo</div>
+      <h2 style="margin-bottom:10px">01 / Compress</h2>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:10px">Image compressor</div>
+      <p style="color:var(--fg2);line-height:1.6;font-size:14px;margin:0">Resize and re-encode JPEG, PNG or WebP on a canvas. Tune quality and max width, compare byte sizes, download the result.</p>
+      <div style="margin-top:22px;color:var(--accent);font-weight:650;font-size:14px">Open tool →</div>
+    </a>
+    <a class="card" href="scrub.html" style="text-decoration:none;color:inherit">
+      <div class="pill" style="margin-bottom:18px"><span class="dot"></span> runnable demo</div>
+      <h2 style="margin-bottom:10px">02 / Scrub</h2>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:10px">Metadata scrubber</div>
+      <p style="color:var(--fg2);line-height:1.6;font-size:14px;margin:0">Read real EXIF fields — camera, timestamp, GPS — then re-encode the pixels so none of it travels with the file you share.</p>
+      <div style="margin-top:22px;color:var(--accent);font-weight:650;font-size:14px">Open tool →</div>
+    </a>
+    <a class="card" href="svg.html" style="text-decoration:none;color:inherit">
+      <div class="pill" style="margin-bottom:18px"><span class="dot"></span> runnable demo</div>
+      <h2 style="margin-bottom:10px">03 / Optimize</h2>
+      <div style="font-size:22px;font-weight:700;letter-spacing:-.5px;margin-bottom:10px">SVG optimizer</div>
+      <p style="color:var(--fg2);line-height:1.6;font-size:14px;margin:0">Strip comments, editor metadata and dead attributes; round coordinates and collapse whitespace while keeping a live preview.</p>
+      <div style="margin-top:22px;color:var(--accent);font-weight:650;font-size:14px">Open tool →</div>
+    </a>
+  </div>
+
+  <p class="note" style="text-align:center;max-width:720px;margin:34px auto 0">These demos illustrate the <b>NoUpload</b> design philosophy alongside the main local-RAG workspace. They are not bundled into the NoUploadAI application build; the source for the RAG product lives in the private <b>NoUploadAI-SRC</b> repository.</p>
+  <footer>100% client-side · no server · no account · no uploads</footer>
+</div>
+</body>
+</html>

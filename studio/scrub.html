@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scrub — NoUpload Studio</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="mark"><svg viewBox="0 0 64 64" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round"><path d="M20 42h25a9 9 0 0 0 .6-18A13 13 0 0 0 21 21a10.5 10.5 0 0 0-1 21Z"/><path d="M16 15 47 49"/></svg></div>
+    <div class="brand">NoUpload <span>Studio</span></div>
+    <div class="sub">/ metadata scrubber</div>
+    <a class="back" href="index.html">← All tools</a>
+  </header>
+
+  <h1>Strip the story.<br /><em>Share the picture.</em></h1>
+  <p class="lede">A photo can carry a camera serial, a timestamp and GPS coordinates. This demo reads those EXIF fields and then rebuilds the image from its pixels alone — the download has no metadata left in it.</p>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Input</h2>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose or drop an image">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 16V4m0 0L7 9m5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        <p>Drop a JPEG or PNG, or click to choose</p>
+        <small>EXIF is read locally in this tab</small>
+      </div>
+      <input id="file" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+      <div class="row"><button class="ghost" id="sample">Use sample photo (with GPS)</button></div>
+      <h2 style="margin-top:28px">Detected in the original</h2>
+      <ul class="tags risky" id="before"><li><span>Status</span><span>no file loaded</span></li></ul>
+      <div class="row"><button id="download" disabled>Download scrubbed image</button></div>
+    </section>
+
+    <section class="card">
+      <h2>After scrubbing</h2>
+      <div class="preview" id="preview"><span class="note" style="margin:0;padding:24px">Choose an image to begin.</span></div>
+      <h2 style="margin-top:24px">Remaining metadata</h2>
+      <ul class="tags clean" id="after"><li><span>Status</span><span>no file loaded</span></li></ul>
+      <p class="note">The cleaned file is produced with <code>canvas.toBlob()</code>, which writes only pixel data. EXIF, XMP, GPS and PNG text chunks are discarded. No upload is involved.</p>
+    </section>
+  </div>
+  <footer>100% client-side · no server · no account · no uploads</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let lastBlob = null;
+
+const TAGS = { 0x010f:'Camera make', 0x0110:'Camera model', 0x0112:'Orientation', 0x0131:'Software', 0x0132:'Date & time', 0x9003:'Original capture time', 0xa433:'Lens make', 0xa434:'Lens model' };
+const GPS_NAMES = { 1:'GPS lat ref', 2:'GPS latitude', 3:'GPS lon ref', 4:'GPS longitude' };
+
+function entries(dv, base, ifdOffset) {
+  const out = new Map();
+  const le = dv.getUint16(base) === 0x4949;
+  const n = dv.getUint16(base + ifdOffset, le);
+  for (let i = 0; i < n; i++) {
+    const p = base + ifdOffset + 2 + i * 12;
+    const tag = dv.getUint16(p, le), type = dv.getUint16(p + 2, le), count = dv.getUint32(p + 4, le);
+    let value = null;
+    if (type === 2) {
+      const start = count <= 4 ? p + 8 : base + dv.getUint32(p + 8, le);
+      value = '';
+      for (let j = 0; j < count; j++) { const c = dv.getUint8(start + j); if (!c) break; value += String.fromCharCode(c); }
+    } else if (type === 5 || type === 10) {
+      const start = base + dv.getUint32(p + 8, le);
+      const parts = [];
+      for (let j = 0; j < Math.min(count, 3); j++) {
+        const num = type === 5 ? dv.getUint32(start + j * 8, le) : dv.getInt32(start + j * 8, le);
+        const den = type === 5 ? dv.getUint32(start + j * 8 + 4, le) : dv.getInt32(start + j * 8 + 4, le);
+        parts.push(den ? num / den : 0);
+      }
+      value = parts;
+    } else if (count === 1) {
+      value = type === 3 ? dv.getUint16(p + 8, le) : dv.getUint32(p + 8, le);
+    }
+    out.set(tag, { value, offset: type === 4 && count === 1 ? dv.getUint32(p + 8, le) : null });
+  }
+  return out;
+}
+
+function dms(parts, ref) {
+  if (!Array.isArray(parts)) return String(parts ?? '');
+  const [d, m = 0, s = 0] = parts;
+  return `${d}° ${m}' ${s.toFixed(1)}" ${ref || ''}`.trim();
+}
+
+async function readMeta(file) {
+  const buf = new DataView(await file.arrayBuffer());
+  const found = [];
+  if (buf.byteLength > 24 && buf.getUint32(0) === 0x89504e47) {
+    let off = 8;
+    while (off + 8 < buf.byteLength) {
+      const len = buf.getUint32(off);
+      const type = String.fromCharCode(...[0,1,2,3].map(i => buf.getUint8(off + 4 + i)));
+      if (['tEXt','iTXt','zTXt'].includes(type)) found.push(['PNG ' + type, len + ' bytes']);
+      off += 12 + len;
+      if (len < 0 || off > buf.byteLength) break;
+    }
+    return found;
+  }
+  let off = 2;
+  while (off + 4 < buf.byteLength) {
+    if (buf.getUint16(off) !== 0xffe1) { off += 2; continue; }
+    const len = buf.getUint16(off + 2);
+    const sig = String.fromCharCode(...[0,1,2,3,4,5].map(i => buf.getUint8(off + 4 + i)));
+    if (sig === 'Exif\u0000\u0000') {
+      const base = off + 10;
+      const ifd0 = entries(buf, base, buf.getUint32(base + 4, buf.getUint16(base) === 0x4949));
+      for (const [tag, name] of Object.entries(TAGS)) {
+        if (ifd0.has(+tag)) found.push([name, String(ifd0.get(+tag).value ?? '')]);
+      }
+      if (ifd0.has(0x8825)) {
+        const gps = entries(buf, base, ifd0.get(0x8825).offset);
+        found.push(['GPS latitude', dms(gps.get(2)?.value, gps.get(1)?.value)]);
+        found.push(['GPS longitude', dms(gps.get(4)?.value, gps.get(3)?.value)]);
+      }
+      break;
+    }
+    off += 2 + len;
+  }
+  return found;
+}
+
+function render(list, el, empty) {
+  el.innerHTML = '';
+  if (!list.length) { el.innerHTML = `<li><span>${empty}</span><span>none</span></li>`; return; }
+  for (const [k, v] of list) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span>${k}</span><span></span>`;
+    li.lastElementChild.textContent = v;
+    el.appendChild(li);
+  }
+}
+
+async function load(file, name) {
+  if (!file) return;
+  const meta = await readMeta(file);
+  render(meta, $('before'), 'Metadata fields');
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width; canvas.height = bitmap.height;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0);
+  lastBlob = await new Promise(r => canvas.toBlob(r, file.type === 'image/png' ? 'image/png' : 'image/jpeg', .92));
+  const clean = await readMeta(new File([lastBlob], 'clean', { type: lastBlob.type }));
+  render(clean, $('after'), 'Metadata fields');
+  $('preview').innerHTML = '';
+  const img = document.createElement('img');
+  img.src = URL.createObjectURL(lastBlob);
+  $('preview').appendChild(img);
+  $('download').disabled = false;
+  $('download').dataset.name = name || file.name;
+}
+$('drop').onclick = () => $('file').click();
+$('file').onchange = e => load(e.target.files[0]);
+$('drop').ondragover = e => { e.preventDefault(); $('drop').classList.add('over'); };
+$('drop').ondragleave = () => $('drop').classList.remove('over');
+$('drop').ondrop = e => { e.preventDefault(); $('drop').classList.remove('over'); load(e.dataTransfer.files[0]); };
+$('sample').onclick = async () => {
+  const blob = await (await fetch('sample-photo.jpg')).blob();
+  load(new File([blob], 'sample-photo.jpg', { type: 'image/jpeg' }), 'sample-photo.jpg');
+};
+$('download').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(lastBlob);
+  a.download = 'scrubbed-' + ($('download').dataset.name || 'image.jpg');
+  a.click();
+};
+</script>
+</body>
+</html>

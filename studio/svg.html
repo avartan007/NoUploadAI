@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Optimize SVG — NoUpload Studio</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="wrap">
+  <header class="bar">
+    <div class="mark"><svg viewBox="0 0 64 64" fill="none" stroke="white" stroke-width="4" stroke-linejoin="round"><path d="M20 42h25a9 9 0 0 0 .6-18A13 13 0 0 0 21 21a10.5 10.5 0 0 0-1 21Z"/><path d="M16 15 47 49"/></svg></div>
+    <div class="brand">NoUpload <span>Studio</span></div>
+    <div class="sub">/ svg optimizer</div>
+    <a class="back" href="index.html">← All tools</a>
+  </header>
+
+  <h1>Clean vectors.<br /><em>Same pixels.</em></h1>
+  <p class="lede">Paste SVG markup or open a file. The optimizer removes editor metadata, comments and redundant whitespace, rounds coordinates, and keeps a live preview — entirely in this tab.</p>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Source markup</h2>
+      <textarea id="input" spellcheck="false" placeholder="<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 64 64&quot;> …"></textarea>
+      <div class="row"><button class="ghost" id="sample">Load example</button><button class="ghost" id="filebtn">Open .svg file</button><button id="optimize">Optimize</button></div>
+      <input id="file" type="file" accept=".svg,image/svg+xml" hidden />
+      <p class="note">Try the example to see a design-tool export with comments and editor namespaces cleaned up.</p>
+    </section>
+
+    <section class="card">
+      <h2>Live preview</h2>
+      <div class="preview" id="preview"><span class="note" style="margin:0;padding:24px">Optimized SVG appears here.</span></div>
+      <div class="stats">
+        <div class="stat"><span>Before</span><strong id="before">—</strong></div>
+        <div class="stat"><span>After</span><strong id="after">—</strong></div>
+        <div class="stat"><span>Removed</span><strong id="saved" class="good">—</strong></div>
+      </div>
+      <div class="row"><button id="download" disabled>Download optimized.svg</button></div>
+    </section>
+  </div>
+  <footer>100% client-side · no server · no account · no uploads</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let output = '';
+const example = `<?xml version="1.0" encoding="UTF-8"?>
+<!-- Created with Vector Studio 4.2 -->
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="640.0000" height="320.0000" viewBox="0 0 640 320">
+  <metadata> Designer: Ada · Exported 2026-09-14 </metadata>
+  <title>Private by architecture</title>
+  <rect x="0.000" y="0.000" width="640.000" height="320.000" rx="28.000" fill="#101011" />
+  <g inkscape:label="Layer 1" opacity="1.000">
+    <rect x="40.000" y="48.000" width="88.000" height="88.000" rx="24.000" fill="#c0643f" />
+    <path d="M 60.000 112.000 H 108.000 A 12.000 12.000 0 0 0 108.000 88.000 A 18.000 18.000 0 0 0 74.000 84.000 A 12.000 12.000 0 0 0 60.000 112.000 Z" fill="none" stroke="#ffffff" stroke-width="4.000" />
+    <text x="152.00" y="112.00" fill="#f5f3ef" font-family="sans-serif" font-size="44.00" font-weight="700">NoUploadAI</text>
+    <text x="42.00" y="198.00" fill="#b7b3ac" font-family="sans-serif" font-size="20.00">Your documents never leave this tab.</text>
+    <line x1="42.000" y1="220.000" x2="598.000" y2="220.000" stroke="#c0643f" stroke-width="2.000" />
+  </g>
+</svg>`;
+
+function optimize(src) {
+  let s = src.trim();
+  s = s.replace(/<\?xml[\s\S]*?\?>/g, '');
+  s = s.replace(/<!--[\s\S]*?-->/g, '');
+  s = s.replace(/<metadata\b[^>]*>[\s\S]*?<\/metadata>/gi, '');
+  s = s.replace(/\s+xmlns:(inkscape|sodipodi|sketch|adobe)="[^"]*"/gi, '');
+  s = s.replace(/\s+(inkscape|sodipodi|sketch|adobe):[\w-]+="[^"]*"/gi, '');
+  s = s.replace(/\s+id="[^"]*"/gi, '');
+  s = s.replace(/>\s+</g, '><');
+  s = s.replace(/\s{2,}/g, ' ');
+  s = s.replace(/(-?\d+\.\d{3,})\b/g, (m, n) => String(Math.round(+n * 100) / 100));
+  s = s.replace(/\s+0\.0+\b/g, ' 0');
+  s = s.replace(/<(\w+)([^>]*?)\s*\/>/g, '<$1$2/>');
+  return s + '\n';
+}
+
+function run() {
+  const src = $('input').value;
+  if (!src.trim()) return;
+  output = optimize(src);
+  $('before').textContent = src.length.toLocaleString() + ' ch';
+  $('after').textContent = output.length.toLocaleString() + ' ch';
+  const pct = Math.max(0, Math.round((1 - output.length / src.length) * 100));
+  $('saved').textContent = pct + '%';
+  $('preview').innerHTML = '';
+  const holder = document.createElement('div');
+  holder.style.width = '100%';
+  holder.innerHTML = output;
+  $('preview').appendChild(holder);
+  $('download').disabled = false;
+}
+$('optimize').onclick = run;
+$('sample').onclick = () => { $('input').value = example; run(); };
+$('filebtn').onclick = () => $('file').click();
+$('file').onchange = async e => { $('input').value = await e.target.files[0].text(); run(); };
+$('download').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([output], { type: 'image/svg+xml' }));
+  a.download = 'optimized.svg';
+  a.click();
+};
+</script>
+</body>
+</html>
